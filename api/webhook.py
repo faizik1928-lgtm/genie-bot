@@ -1,7 +1,10 @@
-from http.server import BaseHTTPRequestHandler
+import os
 import json
 import anthropic
 import urllib.request
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
 
 TELEGRAM_BOT_TOKEN = "8995091020:AAHqkFsCAJb5GXsWvRtRIsEiiNuoFjVF0Bc"
 CLAUDE_API_KEY     = "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"
@@ -17,47 +20,39 @@ def send_message(chat_id, text):
         print(f"[send_message error] {e}")
 
 def get_claude_response(user_message):
-    client   = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
+    client = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
     response = client.messages.create(
         model="claude-haiku-4-5",
         max_tokens=800,
-        system="You are Genie, a friendly AI assistant in a Telegram bot. Be helpful and concise.",
+        system="You are Genie 🧞, a friendly and smart AI assistant in a Telegram bot. Be helpful and concise.",
         messages=[{"role": "user", "content": user_message}]
     )
     return response.content[0].text
 
-class handler(BaseHTTPRequestHandler):
-    def do_POST(self):
+@app.route('/api/webhook', methods=['GET', 'POST'])
+def webhook():
+    if request.method == 'POST':
         try:
-            length = int(self.headers.get("Content-Length", 0))
-            body   = self.rfile.read(length)
-            update = json.loads(body.decode("utf-8"))
+            update = request.get_json()
             if "message" in update:
                 message    = update["message"]
                 chat_id    = message["chat"]["id"]
                 first_name = message.get("from", {}).get("first_name", "Friend")
                 text       = message.get("text", "")
+
                 if text == "/start":
-                    reply = f"Hello {first_name}! I'm Genie powered by Claude AI! Ask me anything!"
+                    reply = f"✨ Hello {first_name}! I'm *Genie* 🧞\n\nI'm powered by Claude AI — ask me anything!"
                 elif text == "/help":
-                    reply = "Just type any message and I'll reply with AI!"
+                    reply = "🧞 *Genie Bot Help*\n\nJust type any message and I'll reply with AI!"
                 elif text:
                     reply = get_claude_response(text)
                 else:
-                    reply = "Please send a text message!"
+                    reply = "Please send a text message 😊"
+
                 send_message(chat_id, reply)
         except Exception as e:
             print(f"[webhook error] {e}")
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps({"ok": True}).encode())
+        return jsonify({"ok": True}), 200
 
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html")
-        self.end_headers()
-        self.wfile.write(b"<h1>Genie Bot is Running!</h1>")
+    return "<h1>Genie Bot is Running! 🧞</h1>", 200
 
-    def log_message(self, format, *args):
-        pass

@@ -1,0 +1,99 @@
+from http.server import BaseHTTPRequestHandler
+import json
+import anthropic
+import urllib.request
+
+# ─── Configuration ────────────────────────────────────────────────────────────
+TELEGRAM_BOT_TOKEN = "8995091020:AAHqkFsCAJb5GXsWvRtRIsEiiNuoFjVF0Bc"
+CLAUDE_API_KEY     = "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"
+TELEGRAM_API       = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+
+
+def send_message(chat_id: int, text: str) -> None:
+    """Send a message back to the Telegram user."""
+    url  = f"{TELEGRAM_API}/sendMessage"
+    data = json.dumps({
+        "chat_id":    chat_id,
+        "text":       text,
+        "parse_mode": "Markdown"
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"}
+    )
+    try:
+        urllib.request.urlopen(req, timeout=15)
+    except Exception as e:
+        print(f"[send_message error] {e}")
+
+
+def get_claude_response(user_message: str) -> str:
+    """Call Claude Haiku and return the AI reply."""
+    client = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
+    response = client.messages.create(
+        model="claude-haiku-4-5",
+        max_tokens=800,
+        system=(
+            "You are Genie 🧞, a friendly and smart AI assistant "
+            "living inside a Telegram bot. Be helpful, warm, and concise. "
+            "Use emojis occasionally."
+        ),
+        messages=[{"role": "user", "content": user_message}]
+    )
+    return response.content[0].text
+
+
+class handler(BaseHTTPRequestHandler):
+    """Vercel serverless function handler."""
+
+    def do_POST(self):
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body   = self.rfile.read(length)
+            update = json.loads(body.decode("utf-8"))
+
+            if "message" in update:
+                message    = update["message"]
+                chat_id    = message["chat"]["id"]
+                first_name = message.get("from", {}).get("first_name", "Friend")
+                text       = message.get("text", "")
+
+                if text == "/start":
+                    reply = (
+                        f"✨ Hello {first_name}! I'm *Genie* 🧞\n\n"
+                        "I'm powered by Claude AI — ask me anything!\n\n"
+                        "• /start — Welcome message\n"
+                        "• /help  — Show help"
+                    )
+                elif text == "/help":
+                    reply = (
+                        "🧞 *Genie Bot Help*\n\n"
+                        "Just type any message and I'll reply with AI!\n\n"
+                        "• /start — Welcome message\n"
+                        "• /help  — This message"
+                    )
+                elif text:
+                    reply = get_claude_response(text)
+                else:
+                    reply = "Please send a text message 😊"
+
+                send_message(chat_id, reply)
+
+        except Exception as e:
+            print(f"[webhook error] {e}")
+
+        # Always return 200 so Telegram stops retrying
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps({"ok": True}).encode())
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.end_headers()
+        self.wfile.write(b"<h1>Genie Bot is Running! 🧞</h1>")
+
+    def log_message(self, format, *args):
+        pass  # Suppress default access logs

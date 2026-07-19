@@ -6,7 +6,7 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-TELEGRAM_BOT_TOKEN = "8995091020:AAHqkFsCAJb5GXsWvRtRIsEiiNuoFjVF0Bc"
+TELEGRAM_BOT_TOKEN = TELEGRAM_BOT_TOKEN = "8995091020:AAHlEox6WD-soUDzkZEH-OkStR1tbS5Y9nA"
 CLAUDE_API_KEY     = "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"
 TELEGRAM_API       = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
